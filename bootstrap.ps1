@@ -279,10 +279,11 @@ else {
 # ---------------------------------------------------------------------------
 
 $services = @(
-    @{ name = "Ticketing";  dir = "TransportPlatform.Ticketing" },
-    @{ name = "Accounting"; dir = "TransportPlatform.Accounting" },
-    @{ name = "Reporting";  dir = "TransportPlatform.Reporting" },
-    @{ name = "Gateway";    dir = "TransportPlatform.Gateway" }
+    @{ name = "Ticketing";      dir = "TransportPlatform.Ticketing" },
+    @{ name = "Accounting";     dir = "TransportPlatform.Accounting" },
+    @{ name = "Reporting";      dir = "TransportPlatform.Reporting" },
+    @{ name = "Gateway";        dir = "TransportPlatform.Gateway" },
+    @{ name = "BackofficeApp";  dir = "TransportPlatform.BackofficeApp" }
 )
 
 if (-not $SkipServices) {
@@ -308,10 +309,11 @@ if (-not $SkipServices) {
     Write-Step "Waiting for services to become healthy"
 
     $healthChecks = @(
-        @{ url = "http://localhost:5001/health"; label = "Ticketing  (5001)" },
-        @{ url = "http://localhost:5101/health"; label = "Accounting (5101)" },
-        @{ url = "http://localhost:5201/health"; label = "Reporting  (5201)" },
-        @{ url = "http://localhost:8081/health"; label = "Gateway    (8081)" }
+        @{ url = "http://localhost:5001/health"; label = "Ticketing    (5001)" },
+        @{ url = "http://localhost:5101/health"; label = "Accounting   (5101)" },
+        @{ url = "http://localhost:5201/health"; label = "Reporting    (5201)" },
+        @{ url = "http://localhost:8081/health"; label = "Gateway      (8081)" },
+        @{ url = "http://localhost:4200";        label = "Backoffice   (4200)" }
     )
 
     foreach ($hc in $healthChecks) {
@@ -337,6 +339,7 @@ Write-Host "  TransportPlatform bootstrap complete!" -ForegroundColor Green
 Write-Host "-----------------------------------------------------------" -ForegroundColor Green
 Write-Host ""
 Write-Host "  Services" -ForegroundColor White
+Write-Host "    Backoffice       http://localhost:4200"
 Write-Host "    Ticketing API    http://localhost:5001/swagger"
 Write-Host "    Accounting API   http://localhost:5101/swagger"
 Write-Host "    Reporting API    http://localhost:5201/swagger"
