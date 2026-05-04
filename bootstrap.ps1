@@ -290,6 +290,23 @@ if (-not $SkipNuGet) {
             --skip-duplicate | Out-Null
         Write-Ok "Published $($_.Name)"
     }
+
+    # BaGet's NuGet v3 index has a short delay after a push before packages
+    # are visible to dotnet restore inside Docker. Poll until both packages
+    # appear in the search results before proceeding to the Docker builds.
+    Write-Host "    Waiting for BaGet to index packages ..." -NoNewline
+    $deadline = (Get-Date).AddSeconds(60)
+    while ((Get-Date) -lt $deadline) {
+        try {
+            $hits = (Invoke-WebRequest "http://localhost:5555/v3/search?q=TransportPlatform" -UseBasicParsing -ErrorAction Stop).Content
+            if ($hits -match "Infrastructure.Common" -and $hits -match "Contracts") {
+                Write-Host " indexed!" -ForegroundColor Green
+                break
+            }
+        } catch { }
+        Write-Host "." -NoNewline
+        Start-Sleep -Seconds 2
+    }
 }
 else {
     Write-Warn "Skipping NuGet (-SkipNuGet)"
