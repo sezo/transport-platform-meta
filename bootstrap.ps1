@@ -32,10 +32,24 @@
 .PARAMETER SkipServices
     Skip spinning up application services
 
+.PARAMETER SkipBuild
+    Restart service containers without rebuilding images (docker compose up -d, no --build).
+    Faster rerun when code has not changed.
+
+.PARAMETER Rerun
+    Shortcut for -SkipClone -SkipInfra -SkipNuGet.
+    Pull latest code and rebuild+restart all services. Use after a git push.
+
+.PARAMETER RerunFast
+    Shortcut for -SkipClone -SkipInfra -SkipNuGet -SkipBuild.
+    Just restart containers without pulling or rebuilding. Use after a docker compose down.
+
 .EXAMPLE
-    .\bootstrap.ps1
-    .\bootstrap.ps1 -SkipClone -SkipInfra
-    .\bootstrap.ps1 -GitHubUser myorg
+    .\bootstrap.ps1                      # full first-time setup
+    .\bootstrap.ps1 -Rerun               # pull latest + rebuild services
+    .\bootstrap.ps1 -RerunFast           # restart containers only (no rebuild)
+    .\bootstrap.ps1 -SkipClone -SkipInfra -SkipNuGet   # same as -Rerun but explicit
+    .\bootstrap.ps1 -GitHubUser myorg    # use a different GitHub account
 #>
 
 param(
@@ -45,8 +59,15 @@ param(
     [switch]$SkipClone,
     [switch]$SkipInfra,
     [switch]$SkipNuGet,
-    [switch]$SkipServices
+    [switch]$SkipBuild,
+    [switch]$SkipServices,
+    [switch]$Rerun,
+    [switch]$RerunFast
 )
+
+# Expand convenience shortcuts
+if ($Rerun)     { $SkipClone = $true; $SkipInfra = $true; $SkipNuGet = $true }
+if ($RerunFast) { $SkipClone = $true; $SkipInfra = $true; $SkipNuGet = $true; $SkipBuild = $true }
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -287,7 +308,12 @@ $services = @(
 )
 
 if (-not $SkipServices) {
-    Write-Step "Building and starting application services (first run builds Docker images)"
+    if ($SkipBuild) {
+        Write-Step "Starting application services (skipping image rebuild)"
+    }
+    else {
+        Write-Step "Building and starting application services (first run builds Docker images)"
+    }
 
     foreach ($svc in $services) {
         $svcDir = Join-Path $root $svc.dir
@@ -295,12 +321,18 @@ if (-not $SkipServices) {
             Write-Warn "$($svc.name) repo not found at $svcDir -- skipping"
             continue
         }
-        Write-Host "    Building and starting $($svc.name) ..."
         Push-Location $svcDir
-        docker compose up -d --build
+        if ($SkipBuild) {
+            Write-Host "    Starting $($svc.name) (no rebuild) ..."
+            docker compose up -d
+        }
+        else {
+            Write-Host "    Building and starting $($svc.name) ..."
+            docker compose up -d --build
+        }
         if ($LASTEXITCODE -ne 0) {
             Pop-Location
-            throw "$($svc.name) failed to build or start. Check the output above."
+            throw "$($svc.name) failed to start. Check the output above."
         }
         Pop-Location
         Write-Ok "$($svc.name) started"
@@ -352,9 +384,14 @@ Write-Host "    RabbitMQ UI      http://localhost:15672 (transport / transport)"
 Write-Host "    Grafana          http://localhost:3000"
 Write-Host "    BaGet            http://localhost:5555"
 Write-Host ""
-Write-Host "  Re-run flags" -ForegroundColor White
+Write-Host "  Re-run shortcuts" -ForegroundColor White
+Write-Host "    -Rerun          pull latest code + rebuild + restart all services"
+Write-Host "    -RerunFast      restart containers only, no pull or rebuild"
+Write-Host ""
+Write-Host "  Individual flags" -ForegroundColor White
 Write-Host "    -SkipClone      don't clone/pull repos"
 Write-Host "    -SkipInfra      don't start infra containers"
 Write-Host "    -SkipNuGet      don't build/push NuGet packages"
-Write-Host "    -SkipServices   don't start service containers"
+Write-Host "    -SkipBuild      don't rebuild Docker images (just restart)"
+Write-Host "    -SkipServices   don't touch service containers at all"
 Write-Host ""
