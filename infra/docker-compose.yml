@@ -1,0 +1,220 @@
+name: transport_infra
+
+services:
+
+  # ── PostgreSQL instances (one per service) ───────────────────────────────────
+
+  postgres-tickets:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: tickets
+      POSTGRES_USER: transport
+      POSTGRES_PASSWORD: transport
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata-tickets:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U transport -d tickets"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - transport-net
+
+  postgres-vehicles:
+    image: postgis/postgis:16-3.4-alpine    # PostGIS enabled for spatial queries
+    environment:
+      POSTGRES_DB: vehicles
+      POSTGRES_USER: transport
+      POSTGRES_PASSWORD: transport
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata-vehicles:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U transport -d vehicles"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - transport-net
+
+  postgres-accounting:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: accounting
+      POSTGRES_USER: transport
+      POSTGRES_PASSWORD: transport
+    ports:
+      - "5434:5432"
+    volumes:
+      - pgdata-accounting:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U transport -d accounting"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - transport-net
+
+  postgres-reporting:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: readmodel
+      POSTGRES_USER: transport
+      POSTGRES_PASSWORD: transport
+    ports:
+      - "5435:5432"
+    volumes:
+      - pgdata-reporting:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U transport -d readmodel"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - transport-net
+
+  # ── Redis ────────────────────────────────────────────────────────────────────
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - transport-net
+
+  # ── RabbitMQ ─────────────────────────────────────────────────────────────────
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: transport
+      RABBITMQ_DEFAULT_PASS: transport
+    ports:
+      - "5672:5672"
+      - "15672:15672"   # Management UI
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - transport-net
+  
+  baget:
+    image: loicsharma/baget
+    environment:
+      - ApiKey=your-secret-key
+      - Storage__Type=FileSystem
+      - Storage__Path=/var/baget/packages
+      - Database__Type=Sqlite
+      - Database__ConnectionString=Data Source=/var/baget/baget.db
+    ports:
+      - "5555:80"
+    volumes:
+      - baget-data:/var/baget
+    networks:
+      - transport-net
+  # ── Keycloak ─────────────────────────────────────────────────────────────────
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    command: start-dev --import-realm
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HTTP_PORT: 8080
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+    ports:
+      - "9090:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/health/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - transport-net
+
+  # ── Observability — Grafana LGTM stack ───────────────────────────────────────
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.104.0
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    ports:
+      - "4317:4317"   # gRPC — services send OTel here
+      - "4318:4318"   # HTTP
+    depends_on:
+      - loki
+      - tempo
+      - prometheus
+    networks:
+      - transport-net
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - loki
+      - tempo
+      - prometheus
+    networks:
+      - transport-net
+
+  loki:
+    image: grafana/loki:3.0.0
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - transport-net
+
+  tempo:
+    image: grafana/tempo:2.5.0
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml
+      - tempo-data:/tmp/tempo
+    networks:
+      - transport-net
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - transport-net
+
+# ── Named network — all service repos attach to this as external ──────────────
+networks:
+  transport-net:
+    name: transport-net
+    driver: bridge
+
+volumes:
+  pgdata-tickets:
+  pgdata-vehicles:
+  pgdata-accounting:
+  pgdata-reporting:
+  rabbitmq-data:
+  grafana-data:
+  tempo-data:
+  baget-data: 

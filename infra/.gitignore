@@ -1,0 +1,16 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets — never commit these
+infra/.env
+infra/keycloak/secrets/
+**/*.secrets.json
+
+# IDE
+.idea/
+.vscode/
+*.user
+
+# Logs
+*.log
