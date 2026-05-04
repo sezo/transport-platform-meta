@@ -282,12 +282,17 @@ if (-not $SkipNuGet) {
         Write-Ok "Packed $pkgName"
     }
 
+    # Use the Infrastructure repo's NuGet.config which has allowInsecureConnections=true
+    # so dotnet nuget push works with the HTTP BaGet source (newer SDKs block HTTP otherwise)
+    $nugetConfig = Join-Path $root "TransportPlatform.Infrastructure\NuGet.config"
+
     Get-ChildItem -Path $nupkgOut -Filter "*.nupkg" | ForEach-Object {
         Write-Host "    Publishing $($_.Name) ..."
         dotnet nuget push $_.FullName `
-            --source $BaGetUrl `
+            --source "TransportPlatform" `
             --api-key $BaGetApiKey `
-            --skip-duplicate | Out-Null
+            --skip-duplicate `
+            --configfile $nugetConfig | Out-Null
         Write-Ok "Published $($_.Name)"
     }
 
