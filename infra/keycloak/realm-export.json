@@ -5,91 +5,376 @@
   "registrationAllowed": false,
   "loginWithEmailAllowed": true,
   "duplicateEmailsAllowed": false,
+  "accessTokenLifespan": 3600,
+  "refreshTokenMaxReuse": 0,
+
   "roles": {
     "realm": [
-      { "name": "Passenger", "description": "B2C passenger" },
-      { "name": "BusinessClient", "description": "B2B client" },
-      { "name": "Inspector", "description": "Ticket inspector — VPN access" },
-      { "name": "Driver", "description": "Vehicle driver — VPN access" },
-      { "name": "FleetManager", "description": "Fleet management — VPN access" },
-      { "name": "OnboardDevice", "description": "Onboard CPU service account" },
-      { "name": "SmartCardDevice", "description": "Smart card reader service account" },
-      { "name": "Admin", "description": "Backoffice administrator" },
-      { "name": "Accountant", "description": "Accounting staff" }
+      {
+        "name": "permission:ticket:read",
+        "description": "Read own tickets and routes"
+      },
+      {
+        "name": "permission:ticket:write",
+        "description": "Buy, validate and cancel tickets"
+      },
+      {
+        "name": "permission:accounting:read",
+        "description": "Read ledger and financial summaries"
+      },
+      {
+        "name": "permission:accounting:write",
+        "description": "Manage customers and employees"
+      },
+
+      {
+        "name": "Passenger",
+        "description": "B2C passenger — can buy and use tickets",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "permission:ticket:read",
+            "permission:ticket:write"
+          ]
+        }
+      },
+      {
+        "name": "BusinessClient",
+        "description": "B2B client — bulk ticket purchasing",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "permission:ticket:read",
+            "permission:ticket:write"
+          ]
+        }
+      },
+      {
+        "name": "Inspector",
+        "description": "Ticket inspector — validates tickets on vehicles",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "permission:ticket:read",
+            "permission:ticket:write"
+          ]
+        }
+      },
+      {
+        "name": "Driver",
+        "description": "Vehicle driver — VPN access only",
+        "composite": false
+      },
+      {
+        "name": "FleetManager",
+        "description": "Fleet management — VPN access",
+        "composite": false
+      },
+      {
+        "name": "OnboardDevice",
+        "description": "Onboard CPU service account",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "permission:ticket:read",
+            "permission:ticket:write"
+          ]
+        }
+      },
+      {
+        "name": "SmartCardDevice",
+        "description": "Smart card reader service account",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "permission:ticket:read",
+            "permission:ticket:write"
+          ]
+        }
+      },
+      {
+        "name": "Accountant",
+        "description": "Accounting staff",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "permission:accounting:read",
+            "permission:accounting:write"
+          ]
+        }
+      },
+      {
+        "name": "Admin",
+        "description": "Backoffice administrator — full access",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "permission:ticket:read",
+            "permission:ticket:write",
+            "permission:accounting:read",
+            "permission:accounting:write"
+          ]
+        }
+      }
     ]
   },
+
   "clients": [
     {
       "clientId": "public-gateway",
       "name": "YARP Public Gateway",
+      "description": "M2M client — public gateway validates user tokens, calls services with M2M token",
       "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "public-gateway-secret",
       "serviceAccountsEnabled": true,
-      "description": "M2M client for public gateway → service calls"
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
     },
     {
       "clientId": "internal-gateway",
       "name": "YARP Internal Gateway",
+      "description": "M2M client — internal gateway, VPN only",
       "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "internal-gateway-secret",
       "serviceAccountsEnabled": true,
-      "description": "M2M client for internal gateway → service calls (VPN only)"
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
     },
     {
       "clientId": "transport-ticketing",
       "name": "Ticketing Service",
+      "description": "Audience for ticketing API — also used as M2M client",
       "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "ticketing-secret",
       "serviceAccountsEnabled": true,
-      "description": "M2M client for ticketing service → service calls"
-    },
-    {
-      "clientId": "transport-vehicles",
-      "name": "Vehicle Service",
-      "enabled": true,
-      "serviceAccountsEnabled": true,
-      "description": "M2M client for vehicle service → service calls"
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
     },
     {
       "clientId": "transport-accounting",
       "name": "Accounting Service",
+      "description": "Audience for accounting API — also used as M2M client",
       "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "accounting-secret",
       "serviceAccountsEnabled": true,
-      "description": "M2M client for accounting service → service calls"
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
     },
     {
       "clientId": "transport-reporting",
       "name": "Reporting Service",
+      "description": "Audience for reporting API — also used as M2M client",
       "enabled": true,
-      "serviceAccountsEnabled": true
+      "clientAuthenticatorType": "client-secret",
+      "secret": "reporting-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    },
+    {
+      "clientId": "transport-vehicles",
+      "name": "Vehicle Service",
+      "description": "Audience for vehicle API — also used as M2M client",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "vehicles-secret",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    },
+    {
+      "clientId": "transport-backoffice",
+      "name": "Backoffice App",
+      "description": "Angular backoffice SPA — authorization code + PKCE",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://localhost:4200/*",
+        "http://localhost:8081/*"
+      ],
+      "webOrigins": [
+        "http://localhost:4200",
+        "http://localhost:8081"
+      ],
+      "protocolMappers": [
+        {
+          "name": "realm-roles-to-token",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String"
+          }
+        }
+      ]
     },
     {
       "clientId": "b2c-web",
       "name": "B2C Web Portal",
+      "description": "Passenger-facing web app — authorization code + PKCE",
       "enabled": true,
       "publicClient": true,
-      "redirectUris": ["http://localhost:4200/*"],
-      "webOrigins": ["http://localhost:4200"]
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://localhost:4201/*"
+      ],
+      "webOrigins": [
+        "http://localhost:4201"
+      ],
+      "protocolMappers": [
+        {
+          "name": "realm-roles-to-token",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String"
+          }
+        }
+      ]
     },
     {
       "clientId": "b2b-web",
       "name": "B2B Web Portal",
+      "description": "Business client web app — authorization code + PKCE",
       "enabled": true,
       "publicClient": true,
-      "redirectUris": ["http://localhost:4201/*"],
-      "webOrigins": ["http://localhost:4201"]
-    },
-    {
-      "clientId": "admin-web",
-      "name": "Admin Portal",
-      "enabled": true,
-      "publicClient": true,
-      "redirectUris": ["http://localhost:4202/*"],
-      "webOrigins": ["http://localhost:4202"]
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://localhost:4202/*"
+      ],
+      "webOrigins": [
+        "http://localhost:4202"
+      ],
+      "protocolMappers": [
+        {
+          "name": "realm-roles-to-token",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String"
+          }
+        }
+      ]
     },
     {
       "clientId": "mobile-app",
       "name": "Mobile App (Flutter)",
+      "description": "Flutter mobile app — authorization code + PKCE",
       "enabled": true,
       "publicClient": true,
-      "redirectUris": ["transportplatform://auth/callback"]
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "transportplatform://auth/callback"
+      ],
+      "protocolMappers": [
+        {
+          "name": "realm-roles-to-token",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "claim.name": "roles",
+            "jsonType.label": "String"
+          }
+        }
+      ]
+    }
+  ],
+
+  "users": [
+    {
+      "username": "admin",
+      "email": "admin@transport.local",
+      "firstName": "Admin",
+      "lastName": "User",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Admin1!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["Admin"]
+    },
+    {
+      "username": "passenger",
+      "email": "passenger@transport.local",
+      "firstName": "Test",
+      "lastName": "Passenger",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Passenger1!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["Passenger"]
+    },
+    {
+      "username": "accountant",
+      "email": "accountant@transport.local",
+      "firstName": "Test",
+      "lastName": "Accountant",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Accountant1!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["Accountant"]
+    },
+    {
+      "username": "inspector",
+      "email": "inspector@transport.local",
+      "firstName": "Test",
+      "lastName": "Inspector",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "Inspector1!",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["Inspector"]
     }
   ]
 }
