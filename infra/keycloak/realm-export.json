@@ -216,6 +216,17 @@
             "claim.name": "roles",
             "jsonType.label": "String"
           }
+        },
+        {
+          "name": "internal-gateway-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "internal-gateway",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
         }
       ]
     },
