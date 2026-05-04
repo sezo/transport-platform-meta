@@ -294,9 +294,13 @@ if (-not $SkipServices) {
             Write-Warn "$($svc.name) repo not found at $svcDir -- skipping"
             continue
         }
-        Write-Host "    Starting $($svc.name) ..."
+        Write-Host "    Building and starting $($svc.name) ..."
         Push-Location $svcDir
-        docker compose up -d --build | Out-Null
+        docker compose up -d --build
+        if ($LASTEXITCODE -ne 0) {
+            Pop-Location
+            throw "$($svc.name) failed to build or start. Check the output above."
+        }
         Pop-Location
         Write-Ok "$($svc.name) started"
     }
@@ -304,10 +308,10 @@ if (-not $SkipServices) {
     Write-Step "Waiting for services to become healthy"
 
     $healthChecks = @(
-        @{ url = "http://localhost:5001/swagger/v1/swagger.json"; label = "Ticketing  (5001)" },
-        @{ url = "http://localhost:5101/swagger/v1/swagger.json"; label = "Accounting (5101)" },
-        @{ url = "http://localhost:5201/swagger/v1/swagger.json"; label = "Reporting  (5201)" },
-        @{ url = "http://localhost:8081/health";                  label = "Gateway    (8081)" }
+        @{ url = "http://localhost:5001/health"; label = "Ticketing  (5001)" },
+        @{ url = "http://localhost:5101/health"; label = "Accounting (5101)" },
+        @{ url = "http://localhost:5201/health"; label = "Reporting  (5201)" },
+        @{ url = "http://localhost:8081/health"; label = "Gateway    (8081)" }
     )
 
     foreach ($hc in $healthChecks) {
