@@ -204,8 +204,8 @@ if (-not $SkipInfra) {
     # RabbitMQ AMQP
     Wait-Tcp "localhost" 5672 60 "RabbitMQ AMQP (5672)"
 
-    # BaGet
-    Wait-Http "http://localhost:5555/health" 120 "BaGet (5555)"
+    # BaGet -- no /health endpoint; poll the NuGet v3 index instead
+    Wait-Http "http://localhost:5555/v3/index.json" 120 "BaGet (5555)"
 
     # Keycloak takes the longest
     Write-Host "    Waiting for Keycloak (up to 2 min) ..." -NoNewline
