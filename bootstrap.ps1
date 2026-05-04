@@ -119,7 +119,7 @@ foreach ($tool in @("git", "docker", "dotnet")) {
     Write-Ok "$tool found"
 }
 
-docker info 2>&1 | Out-Null
+docker info | Out-Null
 if ($LASTEXITCODE -ne 0) {
     throw "Docker daemon is not running. Start Docker Desktop and re-run."
 }
@@ -162,13 +162,13 @@ if (-not $SkipClone) {
         if (Test-Path $dest) {
             Write-Warn "$($repo.name) already exists -- pulling latest"
             Push-Location $dest
-            git pull --ff-only 2>&1 | Out-Null
+            git pull --ff-only | Out-Null
             Pop-Location
         }
         else {
             $cloneUrl = "https://github.com/$GitHubUser/$($repo.gh).git"
             Write-Host "    Cloning $($repo.name) ..."
-            git clone $cloneUrl $dest 2>&1 | Out-Null
+            git clone $cloneUrl $dest | Out-Null
             Write-Ok "Cloned $($repo.name)"
         }
     }
@@ -191,7 +191,7 @@ if (-not $SkipInfra) {
     }
 
     Push-Location $infraDir
-    docker compose up -d 2>&1 | Out-Null
+    docker compose up -d | Out-Null
     Pop-Location
     Write-Ok "Infrastructure containers started"
 
@@ -253,10 +253,10 @@ if (-not $SkipNuGet) {
         $csproj  = Join-Path $infraSrc $pkg
         $pkgName = [System.IO.Path]::GetFileNameWithoutExtension(($pkg -split "\\")[1])
         Write-Host "    Packing $pkgName ..."
-        dotnet pack $csproj -c Release -o $nupkgOut --no-restore 2>&1 | Out-Null
+        dotnet pack $csproj -c Release -o $nupkgOut --no-restore | Out-Null
         if ($LASTEXITCODE -ne 0) {
-            dotnet restore $csproj 2>&1 | Out-Null
-            dotnet pack $csproj -c Release -o $nupkgOut 2>&1 | Out-Null
+            dotnet restore $csproj | Out-Null
+            dotnet pack $csproj -c Release -o $nupkgOut | Out-Null
         }
         Write-Ok "Packed $pkgName"
     }
@@ -266,7 +266,7 @@ if (-not $SkipNuGet) {
         dotnet nuget push $_.FullName `
             --source $BaGetUrl `
             --api-key $BaGetApiKey `
-            --skip-duplicate 2>&1 | Out-Null
+            --skip-duplicate | Out-Null
         Write-Ok "Published $($_.Name)"
     }
 }
@@ -296,7 +296,7 @@ if (-not $SkipServices) {
         }
         Write-Host "    Starting $($svc.name) ..."
         Push-Location $svcDir
-        docker compose up -d --build 2>&1 | Out-Null
+        docker compose up -d --build | Out-Null
         Pop-Location
         Write-Ok "$($svc.name) started"
     }
